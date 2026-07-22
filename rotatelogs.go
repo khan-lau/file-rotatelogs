@@ -80,6 +80,7 @@ func New(p string, options ...Option) (*RotateLogs, error) {
 		}
 	}
 
+	// 不能同时设置 maxAge 和 rotationCount
 	if maxAge > 0 && rotationCount > 0 {
 		return nil, errors.New("options MaxAge and RotationCount cannot be both set")
 	}
@@ -203,7 +204,7 @@ func (rl *RotateLogs) getWriter_nolock(bailOnRotateFail, useGenerationalNames bo
 					name = fmt.Sprintf("%s.%d", filename, generation)
 				}
 			}
-			if _, err := os.Stat(name); err != nil {
+			if _, statErr := os.Stat(name); statErr != nil {
 				filename = name
 				break
 			}
@@ -279,6 +280,7 @@ func (g *cleanupGuard) Enable() {
 	defer g.mutex.Unlock()
 	g.enable = true
 }
+
 func (g *cleanupGuard) Run() {
 	g.fn()
 }
@@ -326,28 +328,28 @@ func (rl *RotateLogs) rotate_nolock(filename string) error {
 
 		baseDir := filepath.Dir(filename)
 		if strings.Contains(rl.linkName, baseDir) {
-			tmp, err := filepath.Rel(linkDir, filename)
-			if err != nil {
-				return errors.Wrapf(err, `failed to evaluate relative path from %#v to %#v`, baseDir, rl.linkName)
+			tmp, relErr := filepath.Rel(linkDir, filename)
+			if relErr != nil {
+				return errors.Wrapf(relErr, `failed to evaluate relative path from %#v to %#v`, baseDir, rl.linkName)
 			}
 
 			linkDest = tmp
 		}
 
-		if err := os.Symlink(linkDest, tmpLinkName); err != nil {
-			return errors.Wrap(err, `failed to create new symlink`)
+		if symlinkErr := os.Symlink(linkDest, tmpLinkName); symlinkErr != nil {
+			return errors.Wrap(symlinkErr, `failed to create new symlink`)
 		}
 
 		// the directory where rl.linkName should be created must exist
-		_, err := os.Stat(linkDir)
-		if err != nil { // Assume err != nil means the directory doesn't exist
-			if err := os.MkdirAll(linkDir, 0755); err != nil {
-				return errors.Wrapf(err, `failed to create directory %s`, linkDir)
+		_, statErr := os.Stat(linkDir)
+		if statErr != nil { // Assume err != nil means the directory doesn't exist
+			if mkdirErr := os.MkdirAll(linkDir, 0755); mkdirErr != nil {
+				return errors.Wrapf(mkdirErr, `failed to create directory %s`, linkDir)
 			}
 		}
 
-		if err := os.Rename(tmpLinkName, rl.linkName); err != nil {
-			return errors.Wrap(err, `failed to rename new symlink`)
+		if renameErr := os.Rename(tmpLinkName, rl.linkName); renameErr != nil {
+			return errors.Wrap(renameErr, `failed to rename new symlink`)
 		}
 	}
 
@@ -388,6 +390,7 @@ func (rl *RotateLogs) rotate_nolock(filename string) error {
 		// 调用自定义回调，由用户决定哪些文件应被清理
 		toUnlink = rl.agingFunc(fileInfos)
 	} else {
+		// 同时不设置 maxAge 和 rotationCount 时，返回错误
 		if rl.maxAge <= 0 && rl.rotationCount <= 0 {
 			return errors.New("panic: maxAge and rotationCount are both set")
 		}
