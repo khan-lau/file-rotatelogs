@@ -223,6 +223,12 @@ func (rl *RotateLogs) getWriter_nolock(bailOnRotateFail, useGenerationalNames bo
 		return nil, errors.Errorf("failed to open file %s: %s", rl.pattern, err)
 	}
 
+	// 先关闭旧文件句柄，再执行 rotate_nolock（否则 Windows 上无法删除打开的文件）
+	if rl.outFh != nil {
+		rl.outFh.Close()
+	}
+	rl.outFh = nil
+
 	if err := rl.rotate_nolock(filename); err != nil {
 		err = errors.Wrap(err, "failed to rotate")
 		if bailOnRotateFail {
@@ -241,7 +247,6 @@ func (rl *RotateLogs) getWriter_nolock(bailOnRotateFail, useGenerationalNames bo
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 	}
 
-	rl.outFh.Close()
 	rl.outFh = fh
 	rl.curBaseFn = baseFn
 	rl.curFn = filename
@@ -440,7 +445,12 @@ func (rl *RotateLogs) rotate_nolock(filename string) error {
 	go func() {
 		// unlink files on a separate goroutine
 		for _, path := range toUnlink {
-			os.Remove(path)
+			if err := os.Remove(path); err != nil {
+				// 并发删除时文件可能已被前一个 goroutine 删除，不是错误
+				if !os.IsNotExist(err) {
+					fmt.Fprintf(os.Stderr, "[rotatelogs] failed to remove %s: %s\n", path, err)
+				}
+			}
 		}
 	}()
 
