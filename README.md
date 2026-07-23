@@ -16,22 +16,22 @@ file-rotatelogs
     options := []rotatelogs.Option{}
 
     file_suffix := path.Ext(filename)                         // 获取文件扩展名
-		filen_prefix := strings.TrimSuffix(filename, file_suffix) // 获取文件名称和路径, 不包含扩展名
+    filen_prefix := strings.TrimSuffix(filename, file_suffix) // 获取文件名称和路径, 不包含扩展名
 
-		// 自定义文件老化策略, 回调函数返回实际要删除的文件路径列表
-		options = append(options, rotatelogs.WithAgingFunc(func(files []rotatelogs.LogFileInfo) []string {
-			filePaths := make([]string, 0, len(files))
-			for _, file := range files {
-				kstrings.Debugf("ready remove {}\n", file.Path)
-				filePaths = append(filePaths, file.Path)
-			}
-			return filePaths
-		}))
+    // 自定义文件老化策略, 回调函数返回实际要删除的文件路径列表
+    options = append(options, rotatelogs.WithAgingFunc(func(files []rotatelogs.LogFileInfo) []string {
+      filePaths := make([]string, 0, len(files))
+      for _, file := range files {
+        kstrings.Debugf("ready remove {}\n", file.Path)
+        filePaths = append(filePaths, file.Path)
+      }
+      return filePaths
+    }))
 
-		// 自定义文件滚动策略, 回调函数返回实际要滚动的文件路径
-		options = append(options, rotatelogs.WithNamingFunc(func(baseFilename string, generation int) string {
-			return filen_prefix + ".%Y%m%d%H%M" + file_suffix
-		}))
+    // 自定义文件滚动策略, 回调函数返回实际要滚动的文件路径
+    options = append(options, rotatelogs.WithNamingFunc(func(baseFilename string, generation int) string {
+      return filen_prefix + ".%Y%m%d%H%M" + file_suffix
+    }))
 
 ```
 
