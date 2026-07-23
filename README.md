@@ -1,6 +1,41 @@
 file-rotatelogs
 ==================
 
+2026年7月23日 修复内容
+- 文件老化清理某些条件下失效 bugfix
+- 新增老化回调函数 AgingFunc
+- 新增滚动回调函数 NamingFunc
+
+范例:
+```golang
+    import (
+      rotatelogs "github.com/khan-lau/file-rotatelogs"
+      "github.com/khan-lau/kstrings"
+    )
+   
+    options := []rotatelogs.Option{}
+
+    file_suffix := path.Ext(filename)                         // 获取文件扩展名
+		filen_prefix := strings.TrimSuffix(filename, file_suffix) // 获取文件名称和路径, 不包含扩展名
+
+		// 自定义文件老化策略, 回调函数返回实际要删除的文件路径列表
+		options = append(options, rotatelogs.WithAgingFunc(func(files []rotatelogs.LogFileInfo) []string {
+			filePaths := make([]string, 0, len(files))
+			for _, file := range files {
+				kstrings.Debugf("ready remove {}\n", file.Path)
+				filePaths = append(filePaths, file.Path)
+			}
+			return filePaths
+		}))
+
+		// 自定义文件滚动策略, 回调函数返回实际要滚动的文件路径
+		options = append(options, rotatelogs.WithNamingFunc(func(baseFilename string, generation int) string {
+			return filen_prefix + ".%Y%m%d%H%M" + file_suffix
+		}))
+
+```
+
+
 Provide an `io.Writer` that periodically rotates log files from within the application. Port of [File::RotateLogs](https://metacpan.org/release/File-RotateLogs) from Perl to Go.
 
 [![Build Status](https://travis-ci.org/khan-lau/file-rotatelogs.png?branch=master)](https://travis-ci.org/khan-lau/file-rotatelogs)
